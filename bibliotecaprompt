@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROMPTUS — Biblioteca Profissional de Prompts</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        :root {
+            --bg: #04040a;
+            --surface: #0a0a14;
+            --card: #0f0f1c;
+            --gold: #bf953f;
+            --gold-light: #fcf6ba;
+            --gold-grad: linear-gradient(135deg, #bf953f 0%, #fcf6ba 50%, #b38728 100%);
+            --border: rgba(191,149,63,0.15);
+            --border-hover: rgba(191,149,63,0.4);
+            --text: #f0ede8;
+            --subtext: rgba(240,237,232,0.45);
+            --accent: rgba(191,149,63,0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
+        body::after { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 9998; opacity: 0.4; }
+        .bg-glow { position: fixed; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(ellipse 50% 40% at 15% 10%, rgba(191,149,63,0.06) 0%, transparent 60%), radial-gradient(ellipse 30% 50% at 85% 90%, rgba(191,149,63,0.04) 0%, transparent 60%); }
+        .tela { display: none; position: relative; z-index: 1; }
+        .tela.ativa { display: block; }
+        #tela-login { min-height: 100vh; display: none; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 40px 20px; }
+        #tela-login.ativa { display: flex; }
+        .login-marca { font-family: 'Playfair Display', serif; font-size: 52px; font-weight: 900; background: var(--gold-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px; margin-bottom: 6px; animation: fadeDown 0.8s ease both; }
+        .login-tagline { font-size: 11px; font-weight: 500; letter-spacing: 5px; color: var(--subtext); text-transform: uppercase; margin-bottom: 60px; animation: fadeDown 0.8s 0.1s ease both; }
+        .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 40px; width: 100%; max-width: 380px; animation: fadeUp 0.8s 0.2s ease both; position: relative; overflow: hidden; }
+        .login-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--gold-grad); }
+        .login-box h2 { font-size: 13px; font-weight: 600; letter-spacing: 3px; color: var(--subtext); text-transform: uppercase; margin-bottom: 28px; }
+        .inp { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 4px; padding: 15px 18px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: 0.3s; margin-bottom: 12px; }
+        .inp::placeholder { color: var(--subtext); }
+        .inp:focus { border-color: var(--gold); }
+        .btn-gold { width: 100%; background: var(--gold-grad); color: #000; border: none; padding: 16px; border-radius: 4px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; transition: 0.3s; margin-top: 4px; }
+        .btn-gold:hover { filter: brightness(1.15); }
+        .login-switch { font-size: 12px; color: var(--subtext); margin-top: 20px; }
+        .login-switch span { color: var(--gold); cursor: pointer; font-weight: 600; }
+        .login-switch span:hover { text-decoration: underline; }
+        .login-erro { font-size: 11px; color: #e74c3c; letter-spacing: 1px; margin-top: 12px; min-height: 16px; font-weight: 600; }
+        #tela-plataforma { min-height: 100vh; }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 20px 50px; border-bottom: 1px solid var(--border); background: rgba(4,4,10,0.8); backdrop-filter: blur(20px); position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 15px; }
+        .navbar-logo { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 900; background: var(--gold-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .navbar-right { display: flex; align-items: center; gap: 20px; }
+        .user-badge { background: var(--accent); border: 1px solid var(--border); border-radius: 30px; padding: 8px 16px; font-size: 12px; font-weight: 600; color: var(--gold); letter-spacing: 1px; }
+        .btn-sair { background: none; border: 1px solid rgba(255,255,255,0.1); color: var(--subtext); padding: 8px 16px; border-radius: 4px; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1px; cursor: pointer; transition: 0.3s; }
+        .btn-sair:hover { border-color: #e74c3c; color: #e74c3c; }
+        .hero { padding: 70px 50px 50px; max-width: 1200px; margin: 0 auto; }
+        .hero-label { font-size: 10px; font-weight: 700; letter-spacing: 5px; color: var(--gold); text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+        .hero-label::before { content: ''; width: 30px; height: 1px; background: var(--gold); }
+        .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(36px, 5vw, 60px); font-weight: 900; line-height: 1.1; margin-bottom: 20px; max-width: 700px; }
+        .hero h1 em { font-style: italic; background: var(--gold-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero-sub { font-size: 16px; color: var(--subtext); max-width: 500px; line-height: 1.7; margin-bottom: 40px; }
+        .stats-row { display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 60px; }
+        .stat { text-align: left; }
+        .stat-num { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 900; background: var(--gold-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1; }
+        .stat-label { font-size: 11px; color: var(--subtext); letter-spacing: 1px; margin-top: 4px; }
+        .busca-wrap { max-width: 1200px; margin: 0 auto; padding: 0 50px 30px; }
+        .busca-input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 14px 20px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: 0.3s; }
+        .busca-input::placeholder { color: var(--subtext); }
+        .busca-input:focus { border-color: var(--gold); }
+        .filtros { max-width: 1200px; margin: 0 auto; padding: 0 50px 40px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .filtro-btn { background: var(--card); border: 1px solid var(--border); border-radius: 30px; padding: 9px 18px; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1px; color: var(--subtext); cursor: pointer; transition: 0.3s; text-transform: uppercase; }
+        .filtro-btn:hover { border-color: var(--gold); color: var(--gold); }
+        .filtro-btn.ativo { background: var(--gold-grad); color: #000; border-color: transparent; }
+        .prompts-section { max-width: 1200px; margin: 0 auto; padding: 0 50px 80px; }
+        .section-titulo { font-size: 10px; font-weight: 700; letter-spacing: 4px; color: var(--gold); text-transform: uppercase; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+        .section-titulo::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+        .prompts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        .prompt-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 28px; transition: 0.3s; cursor: pointer; position: relative; overflow: hidden; animation: fadeUp 0.4s ease both; }
+        .prompt-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--gold-grad); transform: scaleX(0); transition: 0.3s; transform-origin: left; }
+        .prompt-card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+        .prompt-card:hover::before { transform: scaleX(1); }
+        .card-area { font-size: 9px; font-weight: 700; letter-spacing: 3px; color: var(--gold); text-transform: uppercase; margin-bottom: 12px; }
+        .card-titulo { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; margin-bottom: 10px; line-height: 1.3; }
+        .card-desc { font-size: 13px; color: var(--subtext); line-height: 1.6; margin-bottom: 20px; }
+        .card-footer { display: flex; align-items: center; justify-content: space-between; }
+        .card-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 4px 10px; border-radius: 20px; background: var(--accent); border: 1px solid var(--border); color: var(--subtext); text-transform: uppercase; }
+        .btn-ver { font-size: 11px; font-weight: 700; color: var(--gold); letter-spacing: 1px; text-transform: uppercase; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
+        .btn-ver:hover { gap: 10px; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 500; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 40px; max-width: 680px; width: 100%; max-height: 85vh; overflow-y: auto; position: relative; animation: fadeUp 0.3s ease both; }
+        .modal::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--gold-grad); }
+        .modal-fechar { position: absolute; top: 16px; right: 20px; background: none; border: none; color: var(--subtext); font-size: 22px; cursor: pointer; transition: 0.2s; }
+        .modal-fechar:hover { color: var(--text); }
+        .modal-area { font-size: 9px; font-weight: 700; letter-spacing: 3px; color: var(--gold); text-transform: uppercase; margin-bottom: 12px; }
+        .modal-titulo { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; margin-bottom: 10px; }
+        .modal-desc { font-size: 13px; color: var(--subtext); line-height: 1.7; margin-bottom: 24px; }
+        .modal-prompt { background: #000; border: 1px solid var(--border); border-radius: 4px; padding: 20px; font-family: 'Courier New', monospace; font-size: 13px; color: #fcf6ba; line-height: 1.7; white-space: pre-wrap; margin-bottom: 20px; max-height: 300px; overflow-y: auto; }
+        .btn-copiar-modal { width: 100%; background: var(--gold-grad); color: #000; border: none; padding: 16px; border-radius: 4px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
+        .btn-copiar-modal:hover { filter: brightness(1.15); }
+        .btn-copiar-modal.ok { background: linear-gradient(135deg, #27ae60, #52c452); }
+        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--gold-grad); color: #000; padding: 14px 28px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; opacity: 0; transition: 0.3s; z-index: 9999; pointer-events: none; white-space: nowrap; }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .vazio { grid-column: 1/-1; text-align: center; padding: 80px 20px; color: var(--subtext); font-size: 13px; letter-spacing: 2px; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeDown { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 768px) { .navbar { padding: 16px 20px; } .hero { padding: 40px 20px 30px; } .busca-wrap, .filtros, .prompts-section { padding-left: 20px; padding-right: 20px; } .prompts-grid { grid-template-columns: 1fr; } .modal { padding: 30px 20px; } }
+    </style>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div id="toast"></div>
+
+<div class="modal-overlay" id="modal-overlay" onclick="fecharModal(event)">
+    <div class="modal" id="modal">
+        <button class="modal-fechar" onclick="fecharModalBtn()">×</button>
+        <div class="modal-area" id="modal-area"></div>
+        <div class="modal-titulo" id="modal-titulo"></div>
+        <div class="modal-desc" id="modal-desc"></div>
+        <div class="modal-prompt" id="modal-prompt"></div>
+        <button class="btn-copiar-modal" id="btn-copiar-modal" onclick="copiarPrompt()">📋 COPIAR PROMPT</button>
+    </div>
+</div>
+
+<div id="tela-login" class="ativa">
+    <div class="login-marca">PROMPTUS</div>
+    <div class="login-tagline">Biblioteca Profissional de Prompts</div>
+    <div class="login-box">
+        <h2 id="login-titulo">Acesse sua conta</h2>
+        <input class="inp" type="email" id="inp-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter') entrar()">
+        <input class="inp" type="password" id="inp-senha" placeholder="Senha" onkeydown="if(event.key==='Enter') entrar()">
+        <input class="inp" type="text" id="inp-nome" placeholder="Seu nome completo" style="display:none" onkeydown="if(event.key==='Enter') entrar()">
+        <button class="btn-gold" onclick="entrar()" id="btn-entrar">ENTRAR</button>
+        <div class="login-erro" id="login-erro"></div>
+        <div class="login-switch" id="login-switch">Não tem conta? <span onclick="alternarModo()">Criar agora</span></div>
+    </div>
+</div>
+
+<div id="tela-plataforma" class="tela">
+    <nav class="navbar">
+        <div class="navbar-logo">PROMPTUS</div>
+        <div class="navbar-right">
+            <div class="user-badge" id="user-badge">...</div>
+            <button class="btn-sair" onclick="sair()">SAIR</button>
+        </div>
+    </nav>
+    <div class="hero">
+        <div class="hero-label">Biblioteca Profissional</div>
+        <h1>Os melhores prompts para <em>profissionais brasileiros</em></h1>
+        <p class="hero-sub">Centenas de prompts calibrados por área, prontos para usar em qualquer IA. Economize horas de trabalho todo dia.</p>
+        <div class="stats-row">
+            <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Prompts disponíveis</div></div>
+            <div class="stat"><div class="stat-num">10</div><div class="stat-label">Áreas profissionais</div></div>
+            <div class="stat"><div class="stat-num">∞</div><div class="stat-label">Possibilidades</div></div>
+        </div>
+    </div>
+    <div class="busca-wrap">
+        <input class="busca-input" type="text" id="busca" placeholder="🔍  Buscar prompt... ex: petição, laudo, relatório" oninput="filtrar()">
+    </div>
+    <div class="filtros" id="filtros"></div>
+    <div class="prompts-section">
+        <div class="section-titulo" id="section-titulo">Todos os Prompts</div>
+        <div class="prompts-grid" id="prompts-grid"></div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = { databaseURL: "https://cassia-v9-default-rtdb.firebaseio.com" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let usuarioAtual = null;
+    let modoLogin = true;
+
+    function alternarModo() {
+        modoLogin = !modoLogin;
+        document.getElementById('login-titulo').innerText = modoLogin ? 'Acesse sua conta' : 'Criar conta grátis';
+        document.getElementById('btn-entrar').innerText = modoLogin ? 'ENTRAR' : 'CRIAR CONTA';
+        document.getElementById('inp-nome').style.display = modoLogin ? 'none' : 'block';
+        document.getElementById('login-switch').innerHTML = modoLogin
+            ? 'Não tem conta? <span onclick="alternarModo()">Criar agora</span>'
+            : 'Já tem conta? <span onclick="alternarModo()">Entrar</span>';
+        document.getElementById('login-erro').innerText = '';
+    }
+
+    function entrar() {
+        const email = document.getElementById('inp-email').value.trim();
+        const senha = document.getElementById('inp-senha').value;
+        const nome = document.getElementById('inp-nome').value.trim();
+        const erro = document.getElementById('login-erro');
+        if (!email || !senha) { erro.innerText = 'PREENCHA TODOS OS CAMPOS'; return; }
+        if (modoLogin) {
+            db.ref('promptus_users').orderByChild('email').equalTo(email).once('value').then(snap => {
+                if (!snap.exists()) { erro.innerText = 'E-MAIL NÃO ENCONTRADO'; return; }
+                const users = snap.val();
+                const uid = Object.keys(users)[0];
+                const user = users[uid];
+                if (user.senha !== btoa(senha)) { erro.innerText = 'SENHA INCORRETA'; return; }
+                usuarioAtual = { uid, ...user };
+                localStorage.setItem('promptus_user', JSON.stringify(usuarioAtual));
+                abrirPlataforma();
+            });
+        } else {
+            if (!nome) { erro.innerText = 'INFORME SEU NOME'; return; }
+            db.ref('promptus_users').orderByChild('email').equalTo(email).once('value').then(snap => {
+                if (snap.exists()) { erro.innerText = 'E-MAIL JÁ CADASTRADO'; return; }
+                const uid = 'u' + Date.now();
+                const user = { nome: nome.toUpperCase(), email, senha: btoa(senha), criadoEm: Date.now() };
+                db.ref('promptus_users/' + uid).set(user).then(() => {
+                    usuarioAtual = { uid, ...user };
+                    localStorage.setItem('promptus_user', JSON.stringify(usuarioAtual));
+                    abrirPlataforma();
+                });
+            });
+        }
+    }
+
+    function sair() {
+        localStorage.removeItem('promptus_user');
+        usuarioAtual = null;
+        document.getElementById('tela-login').classList.add('ativa');
+        document.getElementById('tela-plataforma').classList.remove('ativa');
+        document.getElementById('inp-email').value = '';
+        document.getElementById('inp-senha').value = '';
+    }
+
+    function abrirPlataforma() {
+        document.getElementById('tela-login').classList.remove('ativa');
+        document.getElementById('tela-plataforma').classList.add('ativa');
+        document.getElementById('user-badge').innerText = usuarioAtual.nome.split(' ')[0];
+        renderFiltros();
+        renderPrompts();
+    }
+
+    window.addEventListener('load', () => {
+        const saved = localStorage.getItem('promptus_user');
+        if (saved) { usuarioAtual = JSON.parse(saved); abrirPlataforma(); }
+    });
+
+    const PROMPTS = [
+        { id:1, area:'juridico', emoji:'⚖️', titulo:'Petição Inicial Trabalhista', desc:'Gera uma petição inicial completa para ações trabalhistas com todos os requisitos legais.', tag:'Petição', prompt:`[PROMPTUS — JURÍDICO]\n\nPERSONA: Você é advogado(a) trabalhista sênior com 20 anos de experiência no TRT.\n\nTAREFA: Redigir petição inicial trabalhista completa.\n\nREGRAS:\n- Cite CLT, Súmulas do TST e jurisprudência aplicável\n- Estrutura: qualificação → fatos → direito → pedidos → valor da causa\n- Linguagem técnica e formal\n- NUNCA invente fatos ou valores\n\nDADOS DO CASO:\n[INSIRA AQUI OS FATOS, PARTES E PEDIDOS]` },
+        { id:2, area:'juridico', emoji:'⚖️', titulo:'Contrato de Prestação de Serviços', desc:'Contrato completo com cláusulas de proteção ao contratante e conformidade com o Código Civil.', tag:'Contrato', prompt:`[PROMPTUS — JURÍDICO]\n\nPERSONA: Você é advogado(a) civilista especialista em contratos.\n\nTAREFA: Redigir contrato de prestação de serviços completo.\n\nREGRAS:\n- Base legal: Código Civil arts. 593-609\n- Inclua: objeto, prazo, valor, obrigações, rescisão, foro\n- Linguagem clara mas juridicamente protegida\n\nDADOS:\n[INSIRA PARTES, OBJETO DO SERVIÇO, VALORES E CONDIÇÕES]` },
+        { id:3, area:'juridico', emoji:'⚖️', titulo:'Notificação Extrajudicial', desc:'Notificação formal com validade jurídica para cobranças, descumprimentos e avisos formais.', tag:'Notificação', prompt:`[PROMPTUS — JURÍDICO]\n\nPERSONA: Você é advogado(a) com expertise em notificações extrajudiciais.\n\nTAREFA: Redigir notificação extrajudicial formal.\n\nREGRAS:\n- Tom formal e intimidador dentro da legalidade\n- Cite base legal da obrigação descumprida\n- Estabeleça prazo claro para cumprimento\n- Mencione consequências jurídicas do não cumprimento\n\nDADOS:\n[INSIRA NOTIFICANTE, NOTIFICADO, FATO E EXIGÊNCIA]` },
+        { id:4, area:'juridico', emoji:'⚖️', titulo:'Recurso de Multa de Trânsito', desc:'Recurso administrativo completo para contestar multas de trânsito com fundamentos legais.', tag:'Recurso', prompt:`[PROMPTUS — JURÍDICO]\n\nPERSONA: Você é especialista em direito de trânsito.\n\nTAREFA: Redigir recurso administrativo contra multa de trânsito.\n\nREGRAS:\n- Base legal: CTB Lei 9.503/97\n- Argumente nulidade, cerceamento de defesa ou mérito\n- Tom formal dirigido ao DETRAN/JARI\n\nDADOS DA MULTA:\n[INSIRA AUTO, DATA, INFRAÇÃO E ARGUMENTOS]` },
+        { id:5, area:'medico', emoji:'🏥', titulo:'Laudo Médico Completo', desc:'Laudo técnico estruturado com CID, anamnese, exame físico e conduta médica.', tag:'Laudo', prompt:`[PROMPTUS — MÉDICO]\n\nPERSONA: Você é médico(a) especialista com 20 anos de experiência clínica.\n\nTAREFA: Redigir laudo médico completo.\n\nREGRAS:\n- Baseie-se exclusivamente nos dados fornecidos\n- Estrutura: identificação → anamnese → exame → hipótese diagnóstica → conduta\n- Cite CID-10 quando aplicável\n- NUNCA invente sintomas ou exames\n\nDADOS DO PACIENTE:\n[INSIRA NOME, IDADE, QUEIXAS, EXAMES E HISTÓRICO]` },
+        { id:6, area:'medico', emoji:'🏥', titulo:'Atestado Médico', desc:'Atestado com validade legal, CRM e especificações de afastamento conforme CFM.', tag:'Atestado', prompt:`[PROMPTUS — MÉDICO]\n\nPERSONA: Você é médico(a) com expertise em documentação clínica.\n\nTAREFA: Redigir atestado médico com validade legal.\n\nREGRAS:\n- Conformidade com Resolução CFM 1.658/2002\n- Inclua: identificação do paciente, CID se autorizado, dias de afastamento, CRM\n- Linguagem objetiva e formal\n\nDADOS:\n[INSIRA PACIENTE, DIAGNÓSTICO, PERÍODO E CRM]` },
+        { id:7, area:'medico', emoji:'🏥', titulo:'Relatório de Alta Hospitalar', desc:'Relatório completo de alta com evolução, medicamentos e orientações ao paciente.', tag:'Relatório', prompt:`[PROMPTUS — MÉDICO]\n\nPERSONA: Você é médico(a) hospitalar especialista em documentação.\n\nTAREFA: Redigir relatório de alta hospitalar completo.\n\nREGRAS:\n- Estrutura: dados → internação → evolução → alta → prescrição → orientações\n- Linguagem técnica para prontuário\n- NUNCA invente dados clínicos\n\nDADOS:\n[INSIRA PACIENTE, PERÍODO, DIAGNÓSTICO E EVOLUÇÃO]` },
+        { id:8, area:'negocios', emoji:'💼', titulo:'Plano de Negócios Executivo', desc:'Plano estruturado com análise de mercado, financeiro e estratégia de crescimento.', tag:'Plano', prompt:`[PROMPTUS — NEGÓCIOS]\n\nPERSONA: Você é consultor(a) de negócios sênior com MBA e 20 anos de experiência.\n\nTAREFA: Elaborar plano de negócios executivo completo.\n\nREGRAS:\n- Estrutura: sumário → mercado → produto → financeiro → estratégia\n- Linguagem objetiva e orientada a dados\n- NUNCA invente projeções financeiras\n\nDADOS DA EMPRESA:\n[INSIRA SEGMENTO, PRODUTO, PÚBLICO E DADOS DISPONÍVEIS]` },
+        { id:9, area:'negocios', emoji:'💼', titulo:'Plano de Demissão Humanizada', desc:'Roteiro completo para desligamento respeitoso com comunicado oficial e checklist de RH.', tag:'RH', prompt:`[PROMPTUS — RH]\n\nPERSONA: Você é consultor(a) sênior de RH com 20 anos em gestão de pessoas.\n\nTAREFA: Elaborar plano de demissão humanizada e comunicado oficial.\n\nREGRAS:\n- Inclua: roteiro da conversa, comunicado oficial, checklist de RH, próximos passos\n- Tom sensível mas profissional\n- Proteja juridicamente a empresa\n- NUNCA invente informações sobre o funcionário\n\nDADOS:\n[INSIRA FUNCIONÁRIO, MOTIVO, CARGO E BENEFÍCIOS]` },
+        { id:10, area:'negocios', emoji:'💼', titulo:'Proposta Comercial Profissional', desc:'Proposta de venda completa e persuasiva para conquistar clientes corporativos.', tag:'Vendas', prompt:`[PROMPTUS — NEGÓCIOS]\n\nPERSONA: Você é especialista em vendas B2B com 20 anos de experiência.\n\nTAREFA: Redigir proposta comercial profissional e persuasiva.\n\nREGRAS:\n- Estrutura: apresentação → problema → solução → investimento → próximos passos\n- Tom persuasivo mas formal\n- Foco em valor não em preço\n\nDADOS:\n[INSIRA EMPRESA, PRODUTO/SERVIÇO, CLIENTE E VALOR]` },
+        { id:11, area:'marketing', emoji:'📣', titulo:'Copy para Página de Vendas', desc:'Texto de vendas com gatilhos mentais, prova social e CTA irresistível.', tag:'Copywriting', prompt:`[PROMPTUS — MARKETING]\n\nPERSONA: Você é copywriter sênior especialista em páginas de vendas de alta conversão.\n\nTAREFA: Escrever copy completa para página de vendas.\n\nREGRAS:\n- Use gatilhos: escassez, autoridade, prova social, reciprocidade\n- Estrutura: headline → problema → solução → benefícios → prova → oferta → CTA\n- Linguagem persuasiva adaptada ao público\n\nDADOS:\n[INSIRA PRODUTO, PÚBLICO, PREÇO E DIFERENCIAIS]` },
+        { id:12, area:'marketing', emoji:'📣', titulo:'Roteiro para Vídeo de Vendas', desc:'Script completo para VSL ou vídeo institucional com estrutura de alta conversão.', tag:'Vídeo', prompt:`[PROMPTUS — MARKETING]\n\nPERSONA: Você é roteirista especialista em vídeos de vendas VSL.\n\nTAREFA: Criar roteiro completo para vídeo de vendas.\n\nREGRAS:\n- Estrutura: gancho → dor → agitação → solução → prova → oferta → urgência → CTA\n- Tom conversacional e envolvente\n- Duração estimada: 8-12 minutos\n\nDADOS:\n[INSIRA PRODUTO, PÚBLICO, PROBLEMA QUE RESOLVE E OFERTA]` },
+        { id:13, area:'contabil', emoji:'📊', titulo:'Parecer Contábil', desc:'Parecer técnico contábil com fundamentação nas normas NBC e legislação vigente.', tag:'Parecer', prompt:`[PROMPTUS — CONTÁBIL]\n\nPERSONA: Você é contador(a) sênior com CRC ativo e 20 anos de experiência.\n\nTAREFA: Elaborar parecer contábil técnico.\n\nREGRAS:\n- Cite normas NBC, IFRS e legislação tributária aplicável\n- Estrutura: objeto → análise → fundamentação → conclusão\n- NUNCA invente valores ou lançamentos\n\nDADOS:\n[INSIRA EMPRESA, PERÍODO, SITUAÇÃO E DADOS CONTÁBEIS]` },
+        { id:14, area:'psicologia', emoji:'🧠', titulo:'Relatório Psicológico', desc:'Relatório técnico com anamnese, avaliação e recomendações conforme CFP.', tag:'Relatório', prompt:`[PROMPTUS — PSICOLOGIA]\n\nPERSONA: Você é psicólogo(a) com CRP ativo e 20 anos de experiência clínica.\n\nTAREFA: Elaborar relatório psicológico completo.\n\nREGRAS:\n- Conformidade com Resolução CFP 06/2019\n- Estrutura: identificação → demanda → procedimentos → análise → conclusão\n- NUNCA invente dados do avaliado\n- Linguagem técnica e ética\n\nDADOS:\n[INSIRA PACIENTE, DEMANDA, SESSÕES E OBSERVAÇÕES]` },
+        { id:15, area:'educacao', emoji:'📚', titulo:'Plano de Aula Completo', desc:'Plano estruturado com objetivos BNCC, metodologia ativa e avaliação.', tag:'Plano de Aula', prompt:`[PROMPTUS — EDUCAÇÃO]\n\nPERSONA: Você é pedagogo(a) sênior especialista em currículo e didática.\n\nTAREFA: Elaborar plano de aula completo e estruturado.\n\nREGRAS:\n- Alinhado à BNCC\n- Estrutura: tema → objetivos → habilidades → metodologia → recursos → avaliação\n- Use metodologias ativas\n- NUNCA invente dados de alunos\n\nDADOS:\n[INSIRA DISCIPLINA, ANO, TEMA E CONTEXTO DA TURMA]` },
+        { id:16, area:'engenharia', emoji:'🔧', titulo:'Laudo Técnico de Vistoria', desc:'Laudo de vistoria com fundamentação nas normas ABNT e ART do responsável.', tag:'Laudo', prompt:`[PROMPTUS — ENGENHARIA]\n\nPERSONA: Você é engenheiro(a) civil sênior com CREA ativo.\n\nTAREFA: Elaborar laudo técnico de vistoria.\n\nREGRAS:\n- Referencie NBR aplicável e legislação municipal\n- Estrutura: objeto → metodologia → vistoria → análise → conclusão → recomendações\n- NUNCA invente especificações ou medições\n\nDADOS:\n[INSIRA LOCAL, DATA, FINALIDADE E OBSERVAÇÕES]` },
+        { id:17, area:'ti', emoji:'💻', titulo:'Documento de Requisitos de Software', desc:'Especificação técnica completa de requisitos funcionais e não funcionais.', tag:'Documentação', prompt:`[PROMPTUS — TI]\n\nPERSONA: Você é arquiteto(a) de software sênior com 20 anos de experiência.\n\nTAREFA: Elaborar documento de requisitos de software SRS.\n\nREGRAS:\n- Padrão IEEE 830\n- Estrutura: visão geral → requisitos funcionais → não funcionais → restrições\n- Linguagem técnica e precisa\n- NUNCA invente funcionalidades não informadas\n\nDADOS:\n[INSIRA SISTEMA, STAKEHOLDERS, FUNCIONALIDADES E RESTRIÇÕES]` },
+    ];
+
+    const AREAS = [
+        { key:'todos', label:'Todos', emoji:'✨' },
+        { key:'juridico', label:'Jurídico', emoji:'⚖️' },
+        { key:'medico', label:'Médico', emoji:'🏥' },
+        { key:'negocios', label:'Negócios', emoji:'💼' },
+        { key:'marketing', label:'Marketing', emoji:'📣' },
+        { key:'contabil', label:'Contábil', emoji:'📊' },
+        { key:'psicologia', label:'Psicologia', emoji:'🧠' },
+        { key:'educacao', label:'Educação', emoji:'📚' },
+        { key:'engenharia', label:'Engenharia', emoji:'🔧' },
+        { key:'ti', label:'TI', emoji:'💻' },
+    ];
+
+    let areaAtiva = 'todos';
+    let promptAtual = null;
+
+    function renderFiltros() {
+        const wrap = document.getElementById('filtros');
+        wrap.innerHTML = '';
+        AREAS.forEach(a => {
+            const btn = document.createElement('button');
+            btn.className = 'filtro-btn' + (a.key === areaAtiva ? ' ativo' : '');
+            btn.innerText = a.emoji + ' ' + a.label;
+            btn.onclick = () => { areaAtiva = a.key; renderFiltros(); renderPrompts(); };
+            wrap.appendChild(btn);
+        });
+    }
+
+    function renderPrompts() {
+        const busca = document.getElementById('busca').value.toLowerCase();
+        const grid = document.getElementById('prompts-grid');
+        const stat = document.getElementById('stat-total');
+        let filtrados = PROMPTS.filter(p => {
+            const matchArea = areaAtiva === 'todos' || p.area === areaAtiva;
+            const matchBusca = !busca || p.titulo.toLowerCase().includes(busca) || p.desc.toLowerCase().includes(busca) || p.tag.toLowerCase().includes(busca);
+            return matchArea && matchBusca;
+        });
+        stat.innerText = PROMPTS.length;
+        grid.innerHTML = '';
+        if (filtrados.length === 0) { grid.innerHTML = '<div class="vazio">Nenhum prompt encontrado.</div>'; return; }
+        filtrados.forEach((p, i) => {
+            const card = document.createElement('div');
+            card.className = 'prompt-card';
+            card.style.animationDelay = (i * 0.05) + 's';
+            card.innerHTML = `
+                <div class="card-area">${p.emoji} ${AREAS.find(a => a.key === p.area)?.label}</div>
+                <div class="card-titulo">${p.titulo}</div>
+                <div class="card-desc">${p.desc}</div>
+                <div class="card-footer">
+                    <span class="card-tag">${p.tag}</span>
+                    <button class="btn-ver" onclick="abrirPrompt(${p.id})">VER PROMPT →</button>
+                </div>`;
+            grid.appendChild(card);
+        });
+    }
+
+    function filtrar() { renderPrompts(); }
+
+    function abrirPrompt(id) {
+        const p = PROMPTS.find(x => x.id === id);
+        if (!p) return;
+        promptAtual = p;
+        document.getElementById('modal-area').innerText = p.emoji + ' ' + AREAS.find(a => a.key === p.area)?.label;
+        document.getElementById('modal-titulo').innerText = p.titulo;
+        document.getElementById('modal-desc').innerText = p.desc;
+        document.getElementById('modal-prompt').innerText = p.prompt;
+        document.getElementById('btn-copiar-modal').innerText = '📋 COPIAR PROMPT';
+        document.getElementById('btn-copiar-modal').classList.remove('ok');
+        document.getElementById('modal-overlay').classList.add('show');
+    }
+
+    function fecharModal(e) { if (e.target === document.getElementById('modal-overlay')) fecharModalBtn(); }
+    function fecharModalBtn() { document.getElementById('modal-overlay').classList.remove('show'); }
+
+    function copiarPrompt() {
+        if (!promptAtual) return;
+        const btn = document.getElementById('btn-copiar-modal');
+        const sucesso = () => {
+            btn.innerText = '✓ COPIADO!';
+            btn.classList.add('ok');
+            showToast('PROMPT COPIADO!');
+            setTimeout(() => { btn.innerText = '📋 COPIAR PROMPT'; btn.classList.remove('ok'); }, 2500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(promptAtual.prompt).then(sucesso).catch(() => fallback(sucesso));
+        } else { fallback(sucesso); }
+    }
+
+    function fallback(cb) {
+        const ta = document.createElement('textarea');
+        ta.value = promptAtual.prompt;
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); cb(); } catch(e) {}
+        document.body.removeChild(ta);
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg; t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2500);
+    }
+</script>
+</body>
+</html>
